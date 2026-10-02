@@ -351,10 +351,10 @@ async def _attach_document_context(
         {
             "session_id": context.payload.get("session_id"),
             "worker_generation": context.payload.get("worker_generation"),
-            "doc_id": context.payload["doc_id"],
-            "active_doc_id": context.payload["active_doc_id"],
+            "doc_id": context.payload.get("doc_id", ""),
+            "active_doc_id": context.payload.get("active_doc_id", ""),
             "active_path": context.payload.get("active_path"),
-            "revision": context.payload["revision"],
+            "revision": context.payload.get("revision", 0),
             "lease_token": context.payload.get("lease_token"),
         }
     )
@@ -462,6 +462,9 @@ async def _compensate_product_failure(
         erased,
         reason="product_create_failure_compensation",
     )
+    # Ensure registry is a proper dict (validation of mark_feature_handles_invalid return)
+    if not isinstance(registry, dict):
+        registry = {"invalidated": [], "stale_count": 0, "product_state_revision": 0}
     return {
         "attempted": True,
         "complete": not failed and not missing_preexisting,

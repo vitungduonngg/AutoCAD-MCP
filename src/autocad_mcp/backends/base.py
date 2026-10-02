@@ -26,7 +26,12 @@ class CommandResult:
     def to_dict(self) -> dict:
         d: dict[str, Any] = {"ok": self.ok}
         if self.ok:
-            d["payload"] = self.payload
+            # Ensure payload is JSON-serializable; wrap non-dict payloads
+            if isinstance(self.payload, dict):
+                d["payload"] = self.payload
+            else:
+                # Wrap non-dict payloads in a dict for consistency
+                d["payload"] = {"result": self.payload} if self.payload is not None else None
         else:
             d["error"] = error_payload(
                 self.error,

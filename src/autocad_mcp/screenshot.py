@@ -48,6 +48,16 @@ class MatplotlibScreenshotProvider(ScreenshotProvider):
     def capture(self) -> str | None:
         return self.render()
 
+    def cleanup(self) -> None:
+        """Clean up matplotlib resources."""
+        try:
+            import matplotlib.pyplot as plt
+            plt.close('all')
+        except Exception:
+            # Silently ignore cleanup errors
+            pass
+        self._doc = None
+
     def render(self, dpi: int = 150, background: str = "white") -> str | None:
         if self._doc is None:
             return None

@@ -80,8 +80,13 @@ def infer_error_code(message: str | None) -> str:
         return "E_VARIABLE_REJECTED"
     if "validation" in text or "does not match" in text:
         return "E_VALIDATION_FAILED"
-    if "plot failed" in text or "can not be set" in text:
-        return "E_INTERNAL"
+    if "plot" in text:
+        # More specific plot error detection
+        if "scale" in text:
+            return "E_PLOT_SCALE_MISMATCH"
+        if "page" in text or "media" in text or "paper" in text:
+            return "E_PLOT_PAGE_MISMATCH"
+        return "E_SYSTEM_CALL_FAILED"  # Treat plot failures as system call issues
     if "not supported" in text or "unknown" in text:
         return "E_UNSUPPORTED_OPERATION"
     return "E_INTERNAL"
@@ -94,8 +99,23 @@ def exception_context(
     parameters: dict | None = None,
     system_call: str | None = None,
     file_path: str | None = None,
+    include_traceback: bool = False,
 ) -> tuple[str, dict]:
-    """Describe an exception without reducing it to an opaque ``[Errno N]`` string."""
+    """Describe an exception without reducing it to an opaque ``[Errno N]`` string.
+    
+    Args:
+        exc: The exception to describe
+        operation: Operation that was attempted
+        parameters: Operation parameters (field names will be logged)
+        system_call: Name of system call or operation made
+        file_path: Associated file path if applicable
+        include_traceback: Whether to include traceback info (for debug only)
+    
+    Returns:
+        Tuple of (message: str, details: dict)
+    """
+    import traceback
+    
     errno = getattr(exc, "errno", None)
     winerror = getattr(exc, "winerror", None)
     strerror = getattr(exc, "strerror", None)
@@ -114,6 +134,16 @@ def exception_context(
         "winerror": winerror,
         "system_message": strerror,
     }
+    
+    # Add traceback info if requested (useful for diagnostic logs)
+    if include_traceback:
+        try:
+            tb_lines = traceback.format_exception(type(exc), exc, exc.__traceback__)
+            details["traceback"] = "".join(tb_lines)
+        except Exception:
+            # Never let traceback collection fail the error reporting
+            pass
+    
     return message, {key: value for key, value in details.items() if value is not None}
 
 

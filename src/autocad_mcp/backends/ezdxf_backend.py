@@ -72,6 +72,19 @@ class EzdxfBackend(AutoCADBackend):
             "capabilities": {k: v for k, v in self.capabilities.__dict__.items()},
         })
 
+    async def shutdown(self) -> None:
+        """Clean up backend resources."""
+        try:
+            # Close the screenshot provider to release matplotlib resources
+            if hasattr(self._screenshot, 'cleanup'):
+                self._screenshot.cleanup()
+            # Clear document reference
+            self._doc = None
+            self._msp = None
+        except Exception:
+            # Silently ignore cleanup errors
+            pass
+
     def _next_id(self) -> str:
         self._entity_counter += 1
         return f"ezdxf_{self._entity_counter}"

@@ -564,6 +564,19 @@ def _screenshot_result(
     """Return screenshot metadata by default; inline image requires opt-in."""
     if not result.ok or not result.payload:
         return _format_result(result)
+    # Validate payload type is bytes or string (base64)
+    payload_type = type(result.payload)
+    if not isinstance(result.payload, (bytes, str, dict)):
+        return _json(
+            {
+                "ok": False,
+                "error": {
+                    "message": f"Screenshot payload must be bytes, string, or dict, got {payload_type.__name__}",
+                    "code": "E_SCREENSHOT_TYPE_ERROR",
+                },
+                "details": {"expected": "bytes|str|dict", "actual": payload_type.__name__},
+            }
+        )
     try:
         metadata, raw = _persist_screenshot(result.payload, stem=stem)
     except Exception as exc:
@@ -587,7 +600,7 @@ def _screenshot_result(
     if include_image and allow_inline and len(raw) <= max_inline:
         metadata["inline"] = True
     text = _json({"ok": True, "payload": payload})
-    if metadata["inline"]:
+    if metadata.get("inline", False):
         return [
             TextContent(type="text", text=text),
             ImageContent(type="image", data=base64.b64encode(raw).decode("ascii"), mimeType="image/png"),

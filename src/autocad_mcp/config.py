@@ -8,6 +8,7 @@ import json
 import shlex
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -26,7 +27,40 @@ log = structlog.get_logger()
 
 # Paths
 LISP_DIR = Path(__file__).resolve().parent.parent.parent / "lisp-code"
-IPC_DIR = Path(os.environ.get("AUTOCAD_MCP_IPC_DIR", "C:/temp"))
+
+
+def _initialize_ipc_dir() -> Path:
+    """Initialize IPC directory with proper fallback and error handling."""
+    configured = os.environ.get("AUTOCAD_MCP_IPC_DIR", "").strip()
+    if configured:
+        ipc_path = Path(configured)
+    else:
+        # Use system temp directory as the default instead of hardcoded C:/temp
+        ipc_path = Path(tempfile.gettempdir())
+    
+    try:
+        # Ensure directory exists and is writable
+        ipc_path.mkdir(parents=True, exist_ok=True)
+        # Test writability
+        test_file = ipc_path / ".autocad_mcp_test"
+        test_file.write_text("")
+        test_file.unlink()
+        return ipc_path
+    except (OSError, PermissionError) as e:
+        log.warning("ipc_dir_init_failed", path=str(ipc_path), error=str(e))
+        # Fallback to user's temp directory
+        fallback = Path(tempfile.gettempdir())
+        if fallback != ipc_path:
+            try:
+                fallback.mkdir(parents=True, exist_ok=True)
+                return fallback
+            except (OSError, PermissionError):
+                pass
+    # Last resort: use current working directory
+    return Path.cwd()
+
+
+IPC_DIR = _initialize_ipc_dir()
 
 # Backend selection
 BACKEND_DEFAULT = "auto"  # auto | file_ipc | ezdxf
