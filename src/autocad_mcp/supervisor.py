@@ -60,6 +60,39 @@ def _append_utf8_bom_log(path: Path, event: str, **data: Any) -> None:
 def _process_alive(process_id: int | None) -> bool:
     if not process_id or process_id <= 0:
         return False
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        open_process = kernel32.OpenProcess
+        open_process.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        open_process.restype = wintypes.HANDLE
+        handle = open_process(0x00100000, False, process_id)
+        if not handle:
+            error_code = ctypes.get_last_error()
+            if error_code == 5:
+                return True
+            if error_code == 87:
+                return False
+            raise ctypes.WinError(error_code)
+
+        try:
+            wait_for_single_object = kernel32.WaitForSingleObject
+            wait_for_single_object.argtypes = (wintypes.HANDLE, wintypes.DWORD)
+            wait_for_single_object.restype = wintypes.DWORD
+            close_handle = kernel32.CloseHandle
+            close_handle.argtypes = (wintypes.HANDLE,)
+            close_handle.restype = wintypes.BOOL
+            wait_result = wait_for_single_object(handle, 0)
+            if wait_result == 0x00000102:
+                return True
+            if wait_result == 0:
+                return False
+            raise ctypes.WinError(ctypes.get_last_error())
+        finally:
+            close_handle(handle)
+
     try:
         os.kill(process_id, 0)
         return True

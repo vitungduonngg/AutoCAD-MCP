@@ -2,15 +2,32 @@ from __future__ import annotations
 
 import codecs
 import json
+import os
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
+import autocad_mcp.supervisor as supervisor_module
 from autocad_mcp.supervisor import (
     DesktopSupervisor,
     SupervisorConfig,
     _append_utf8_bom_log,
     read_supervisor_state,
 )
+
+
+@pytest.mark.skipif(
+    sys.platform != "win32", reason="Windows process probing uses Win32 handles"
+)
+def test_process_alive_does_not_send_console_signal_on_windows(monkeypatch):
+    def unexpected_signal(*_args):
+        pytest.fail("Windows process checks must not use os.kill")
+
+    monkeypatch.setattr(supervisor_module.os, "kill", unexpected_signal)
+
+    assert supervisor_module._process_alive(os.getpid())
 
 
 def test_supervisor_log_is_utf8_bom_and_preserves_chinese(tmp_path):
